@@ -1,0 +1,706 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style >
+canvas {
+position:absolute;left:0px;top:0px;
+
+}
+body{
+background:black;
+}
+</style>
+
+<script>
+/*
+Bad style of coding try to understand
+if(u dont understand this)then just play else do what ever u want
+*/
+
+/*check for a point that is inside or outside of box
+/*px = x position of point
+/*py = y position of point
+/*bx = x position of box
+/*by = y position of box
+/*bw = width of box
+/*bh = height of box
+*/
+function pointtobox(px,py,bx,by,bw,bh)
+{
+  //if point is at left or at right position to box that is it outside of box return false;
+	if(px<bx ||px>bx+bw) return false;
+  //if point is above or below of box that is it outside of box return false;
+	if(py<by ||py>by+bh) return false;
+   //return true if point is inside of box
+	return true;
+}
+
+
+
+/*Button for canvas
+/*x = x position of point
+/*y = y position of point
+/*w = width of button
+/*h = height of button
+/*text = Text to be displayed on button
+/*func = what function button will execute
+/*layer = layer or state in which button will be drawn and check for click
+*/
+function Button(x,y,w,h,text,func,layer)
+{
+	this.x = x;this.y = y;
+	this.w = w;this.h = h;
+	this.text = text;
+   this.func=func;
+   this.layer=layer;
+	this.draw = function(ctx)
+	{
+		ctx.fillStyle = "black";//colour of button
+		ctx.fillRect(this.x,this.y,this.w,this.h);//fill the button
+      ctx.strokeStyle="red" //border colour of button
+      ctx.lineWidth=2;
+      ctx.strokeRect (this.x,this.y,this.w,this.h)//draw border around button
+	   ctx.fillStyle = "white";//font colour for text
+		ctx.font = parseInt(this.h/1.2)+"px bold"//font size will change with respect to h
+		ctx.fillText(this.text,this.x+2,this.y+this.h/1.4,this.w-3);//draw text on button
+	}
+}
+
+
+pi2=2*Math.PI;
+function degtorad(x){
+return x*Math.PI/180 ;
+}
+function radtodeg(x){
+return x*180/Math.PI;
+}
+//Math.sin an Math.cos uses radian value 
+//return sin of degree value
+function sin(x)
+{return Math. sin(degtorad(x))}
+//return cos of degree value
+function cos(x)
+{return Math. cos(degtorad(x))}
+//return direction of point
+function xydir(x,y)
+{return radtodeg(Math.atan2(-y,x))}
+
+//return direction of point
+//same as above function but return value from 0 to 360
+function getdir(dx,dy)
+{
+   var dir= Math.atan2(-dy,dx)*180/Math.PI;
+   while(dir<0)
+    {dir+=360;}
+   while(dir>360)
+    {dir-=360;}
+return dir;
+}
+//Check for collision f two objects that have property r (radius)
+function circletocircle(player,point){
+    var r=player.r+point.r;
+    r*=r;
+    var dx=point.x-player.x,dy=point.y-player.y;
+    var dist=dx*dx+dy*dy;
+    if(dist<=r)return true;
+    return false;
+}
+//draw a horizontal Health bar
+function draw_health(ctx,x,y,w,h,bg,fg,p)
+{
+    ctx.fillStyle=bg;
+    ctx.fillRect(x,y,w,h)
+    ctx.fillStyle=fg;
+    ctx.fillRect(x,y,(w*p)/100,h)
+}
+//return direction between two points
+function point_direction(x1,y1,x2,y2)
+{
+return getdir(x2-x1,y2-y1);
+}
+</script></head>
+
+<body>
+
+<script>
+//create canvas element
+canvas = document. createElement("canvas");
+//ctx for 2d drawings
+ctx = canvas. getContext("2d");
+ww=320;hh=534; //resolution for which game designed
+wi= window.innerWidth;hi= window.innerHeight;//resolution of current window
+ratio=hi>wi?hh/ww:ww/hh;//ratio used for keeping ratio between width and height of canvas
+
+//if window with is less then window height we use width for calculation else height for calculation
+if(hi>wi){
+w = wi; //width of canvas set to window width
+h=w*ratio;//height of canvas resize to be of same ratio to wich game design for
+//in some cases height of canvas exceed from window height we resize both width and height of canvas
+if(h>hi){
+var ratio2=(h-hi)/ratio;
+h=hi;
+w -=ratio2
+}
+//scaling of objects to width of canvas
+scale=(w/320) 
+}else{
+
+h=hi;
+w=h*ratio;
+if(w>wi){
+var ratio2= (w-wi)/ratio;
+w=wi;
+h-=ratio2;
+}
+scale=(h/534)
+}
+
+canvas.width= w;
+canvas.height= h;
+
+//set the top and left of canvas so that it present in center of window
+Left= (window.innerWidth/2)-(canvas.width/2)
+canvas.style.left= Left;
+Top= (window.innerHeight/2)-(canvas.height/2)
+canvas.style.top= Top;
+//add canvas to the body
+document.body.appendChild(canvas);
+
+var score = 0;//score
+var count=0;//used for creating bonus point and for increasing level
+lvl=1; //level of game on whicj dpeed of ge depends
+states={splash:0,game:1,score:2,about:3,help:4}//states or levels
+state=states.about;//show about when game start
+
+//array and function used for creating instance of object Buttons
+btn=[];
+function btnadd(x,y,w,h,text,func,layer){
+var b = new Button(x,y,w,h,text,func,layer);
+btn.push(b);
+}
+
+//initialise all objects used in game
+function init_objects()
+{
+//all the variables wich changes when Resolution change are multiplied by scale so they work same in all resolution
+// Player------------------------------------@-------
+    player={x:300*scale,y:300 *scale ,xs:200 *scale ,ys:300 *scale ,
+xv:0,yv:0,
+speed:4 *scale ,direction:315,rot:30,color:"blue",
+r:10*scale ,rstart:10 *scale ,
+_jump:0,a:0,trot:10,size:1 ,
+    update:function()
+{ 
+
+    this.r=this.size*this.rstart;
+    this.xv+=this. speed*cos(this.direction);
+    this.yv+=this. speed*-sin(this.direction);
+    this.trot=   Math.abs(this.trot)*(this. xv/ Math.abs(this.xv) )
+    this. rot+=this.trot;
+   this.rot+=5* (this. xv/ Math.abs(this.xv)) ;
+    this. trot*=.9;
+
+   up=8 *scale;//this is used for jump and dive 
+if(this._jump<0)
+{
+     this.a=this. yv>0? up:up*2;//set value to up if jump and velocity are in same direction else up*2 so it move in opposite direction
+     this.trot= -50*(this. xv/ Math.abs(this.xv))
+     this._jump=0;//set to zero that player dont jump again and again
+}else 
+if(this._jump>0)
+{
+     this.a=this. yv<0? up:up*2;
+     this. a*=-1;//set to negative becsuse it moves up
+    this. trot=-50*(this. xv/ Math.abs(this.xv))
+    b=this.a;
+ this. _jump=0
+}
+    this.y+=this.a;//move layer along y axis to value of a
+    this.a*=0.9; //friction for decresing value of a
+//move player with its velocity 
+   this. x+=this.xv; 
+   this. y+=this.yv;
+//check for collision with boundaries of canvas so it don't go outside of canvas
+   if(this.y-this.r<= canvas.height*.1 ){
+   this. a=0;
+     this.y= this.r +1+ canvas.height*.1 ;
+     this. direction = xydir(this.xv,-this. yv)}
+   if(this.y+ this.r >=canvas.height){
+this. a=0;
+     this.y=canvas.height- this.r -1;
+     this. direction = xydir(this.xv,-this. yv)}
+   if(this.x- this.r <=0){
+     this.x= this.r +1;
+     this. direction = xydir(-this.xv,this. yv)}
+   if(this.x+ this.r >=canvas.width){
+     this.x=canvas.width- this.r -1;
+     this. direction = xydir(-this.xv,this. yv)}
+    this. xv=0;
+    this. yv=0;
+}
+,
+//function for drawing player to canvas
+draw:function(ctx)
+{  
+   ctx. save() // save current rotation and origin of ctx
+   ctx. translate(this.x,this.y)//move origin to position of player
+   ctx.rotate(degtorad(this.rot+60))//rotate to rotation of player
+    ctx. fillStyle = this. color;
+   ctx.beginPath();
+   ctx.arc(0,0,this.r,0,1.5*Math.PI) //draw a circle  not complete circle so we can see rotation of player
+  ctx. fill()
+ctx. restore()
+},
+//jump function called outside of player
+jump:function(j)
+{ 
+    this. _jump=j;
+}
+,
+//reset player to its initial state
+reset:function(){
+  this. x=this.xs;
+ this. y=this.ys;
+ this. size=1;
+this. direction =315;
+}
+}  //end of player
+
+// Point------------------------------
+point ={
+x:100 *scale ,y:200 *scale ,r:5*scale ,rot:0,color:"green",life:100,
+draw:function(ctx)
+{  
+this. rot++;
+ctx. fillStyle = this. color;
+   ctx.beginPath();
+   ctx.arc(this.x,this.y,this.r,0,2*Math.PI)
+  ctx. fill()
+},
+reset:function()
+{
+  this.life=100;
+//calculate position of point so it dont touch bounds of canvas and and hud
+     this. x= Math.round(Math.random()*( canvas.width-canvas.width*.1)+ canvas.width*.05 );
+     this. y= Math.round(Math.random()*(canvas.height-canvas.height*.17)+canvas.height*.13);
+}
+}//end of Point
+
+// Bonus---------same to point---------------------
+bonus ={active:0,
+x:100 *scale ,y:200 *scale ,r:9 *scale ,rot:0,color:"yellow",life:200,
+draw:function(ctx)
+{  
+this. rot++;
+    ctx. fillStyle = this. color;
+   ctx.beginPath();
+   ctx.arc(this.x,this.y,this.r,0,2*Math.PI)
+  ctx. fill()
+},
+reset:function()
+{
+    this.active=1;
+    this.life=100;
+     this. x= Math.round(Math.random()*( canvas.width-canvas.width*.1)+ canvas.width*.05 ) *scale ;
+     this. y= Math.round(Math.random()*(canvas.height-canvas.height*.17)+canvas.height*.13) *scale ;
+}
+}//end of bonus
+
+
+
+
+// enemy----------------------
+    enemy={x:20 *scale ,y:230 *scale ,xs:20 *scale ,ys:320 *scale ,
+xv:0,yv:0,
+speed:3 *scale ,direction:0,rot:30,color:"red",
+r:10 *scale ,
+    update:function()
+{
+    //set direction towards player so enemy can catch player
+   this. direction = point_direction(this.x,this.y,player.x,player.y)
+   this. rot=this.direction;
+   //set velocity in direction towards player
+   this.xv+=this.speed*cos(this.rot)
+   this.yv+=this.speed*-sin(this.rot)
+   this.x+=this.xv;
+   this.y+=this.yv;
+    // reset velocity 
+    this. xv=0;
+     this.yv=0;
+}
+,
+draw:function(ctx)
+{  
+    ctx. save()
+   ctx. translate(this.x,this.y)
+   ctx.rotate(degtorad(this.rot+60))
+   ctx. fillStyle = this. color;
+   ctx.beginPath();
+   ctx.arc(0,0,this.r,0,1.5*Math.PI)
+  ctx. fill()
+ctx. restore()
+},
+reset:function(){
+  this. x=this.xs;
+ this. y=this.ys;
+}
+
+}
+
+//add button to different states with different function
+//btnadd(x,y,w,h,txt,func,state or layer)
+btnadd (canvas.width/2-50*scale ,canvas.height-canvas.height*.6 ,100 *scale ,60 *scale ,"Start","gamestart",states.splash);
+btnadd (canvas.width/2-50*scale ,canvas.height-canvas.height*.45 ,100 *scale ,60 *scale ,"Help","help",states.splash);
+btnadd (canvas.width/2-50*scale ,canvas.height-canvas.height*.3 ,100 *scale ,60 *scale ,"About","about",states.splash);
+btnadd (10*scale ,10*scale ,40*scale ,40 *scale ," X ","exit",states.splash);
+
+btnadd (-60 *scale +canvas.width/2-50*scale ,canvas.height-canvas.height*.3,100 *scale ,100 *scale ,"Restart","gamestart",states.score);
+btnadd (-40 *scale +canvas.width/2+50*scale ,canvas.height-canvas.height*.3 ,100 *scale ,100 *scale ,"Menu","splash",states.score);
+
+btnadd (canvas.width/2-50*scale ,canvas.height-canvas.height*.15,100 *scale ,50 *scale ,"Menu","splash",states.help);
+
+btnadd (12*scale ,canvas.height-canvas.height*.462,canvas.width-20 *scale ,50*scale ,"Fb.com/BlendLightGame","fb",states.about);
+btnadd (12*scale ,canvas.height-canvas.height*.36,canvas.width-20*scale ,50 *scale ,"BlendLightGames.blogspot.com","blog",states.about);
+
+btnadd (canvas.width/2-50*scale ,canvas.height-canvas.height*.15,100 *scale ,50 *scale ,"Menu","splash",states.about);
+
+}
+
+//main function for starting game
+function main()
+{
+ exit = false; //used for exiting game
+   init_objects();//initialise all objects
+   point.reset();//set position of point random 
+//loop for playing game
+loop=function()
+     {
+         update();
+         render()
+         
+        //loop will call itself some interval depends on lvl if exit is false
+       if(!exit)
+         setTimeout(loop,1000/(25+lvl*5))
+     }
+
+loop() ; //start loop of game
+}
+
+
+//set point to position of touch
+function touchstart(e)
+{
+  e.preventDefault();
+   var x=e.touches[0].pageX;
+   var y=e.touches[0].pageY;
+   p0={x:x,y:y}
+}
+//when touch move calculate direction of touch and set player to jump up or down
+function touchmove(e)
+{
+  e.preventDefault();
+   var x=e.touches[0].pageX;
+   var y=e.touches[0].pageY;
+   var dx=x-p0.x,dy=y-p0.y; 
+ var dir = getdir(dx,dy);//dir of touch
+  if(dir>=0&&dir<=180)
+    player.jump(1);
+  else player.jump(-1);
+}
+
+//reset all objects and start game
+function game_reset()
+{
+//set state to game so game can be update and render
+state=states.game;
+lvl=1;
+point.reset();
+score=0;
+count=0;
+player.reset()
+enemy.reset()
+bonus.active=0;
+}
+//gameover function display score to player
+function game_over(){
+    state=states.score;
+}
+
+//update function to update all objects in current state
+function update(){
+switch(state){
+  case states.splash:
+     update_splash();break;
+  case states.game:
+     update_game(); ;break;
+  case states.score:
+     update_score();break;
+  case states.about:
+      update_about();break;
+  case states.help:
+      update_help();break;
+}
+//update the button in every state because button are add to all states
+update_button();
+}
+
+
+//render all objects in current state
+function render(){
+//set shadow alpha to zero that every object don't have shadow
+ctx.shadowColor="rgba(0,0,0,0)"
+switch(state){
+  case states.splash:
+     render_splash();break;
+  case states.game:
+     render_game(); ;break;
+  case states.score:
+     render_score();break;
+  case states.about:
+     render_about();break;
+  case states.help:
+      render_help();break;
+}
+//render button buttons
+render_button();
+}
+
+//function for updating button if button state and current states are same
+function update_button(){
+document.addEventListener("mousedown",function(e)
+{
+ 
+for(var i=0;i<btn.length;i++)
+	{
+      x=e.clientX-Left;
+      y=e.clientY-Top;
+		if(pointtobox(x,y,btn[i].x,btn[i].y,btn[i].w,btn[i].h) //if touch is in button
+&& btn[i].layer==state  )//and button state and current states are equal then
+		{ 
+switch(btn[i].func){//switch between function of button
+case "gamestart"://start the game
+game_reset();break;
+case "splash"://show the menu or splash
+state=states.splash;break;
+case "help"://show help
+state=states.help;break;
+case "about"://show about
+state=states.about;break;
+case "fb": //exit from game
+window.location.href="http://facebook.com/blendlightgame";break;
+case "blog": //exit from game
+window.location.href="http://blendlightgames.blogspot.com";break;
+}}}
+});
+}
+//function for render button if button state and current states are same
+function render_button(){
+for(var i=0;i<btn.length;i++){
+   if(btn[i].layer==state)
+   btn[i].draw(ctx);
+}
+
+}
+
+st=359;//used for background animation of splash screen
+function update_splash()
+{  
+  st=st>=0?st-10:359;
+}
+
+function render_splash()
+{
+ctx.fillStyle="rgba(100,50,200,1) "
+ctx.fillRect(0, 0,canvas.width,canvas.height)
+//draw circle to fill canvas
+for(i=1;i<=canvas.width+20;i+=20){
+for(j=1;j<=canvas.height+20;j+=20){
+ctx.beginPath();
+ctx.fillStyle="rgba("+
+parseInt( (j-100*255/canvas.width)+100 )
++","+
+parseInt(355-(j-100*255/canvas.height)+100 )
++","+
+parseInt((255-i*255/canvas.width)%256+50)
++",1)";
+ctx.arc(i,j,10,degtorad(st+i*360/canvas.width),degtorad(-90+st+i*359/canvas.width));
+ctx.fill();
+}
+}
+}//end of splash
+
+
+//update the game 
+function update_game(){
+//if touch or touchmove event occure call touchstart and touchmove functions
+document.addEventListener("touchstart",touchstart)
+document.addEventListener("touchmove",touchmove)
+//update all objects
+player.update();
+enemy.update();
+if( circletocircle(player,point))//check for collision between player and point
+{ score+=bonus.active?-1:1;//if bonus is active subtract one from score if not add 1 to score
+   count++;//add one to count
+  point.reset(); //reset the point
+}
+if(count>=5)//if cout variable is equal to 5
+{
+   player.size+=player.size*.4;//increase player size
+   bonus.reset()//create the bonus object
+   count=0;
+   lvl++;
+}
+//decrease life of point if less then 20 decrease by small amount
+if(point.life<=20){
+point.life-=.2;
+}else{
+point.life-=.5;
+}
+//if point life =0 or player collide with enemy call function gameover
+if(point.life<=0||circletocircle(player,enemy)||score<=-6)
+{
+game_over();
+point.life=100;
+}
+//if bonus is active update the bonus
+if(bonus.active)
+{
+bonus.life-=.4;
+//if player collide with bonus deactivate bonus and increase score
+if(circletocircle(player,bonus))
+{ score+=4;
+   count=0;
+  player. size=1;
+   bonus.active=0;
+}
+//if player dont collect it and life = 0 decrease score
+if(bonus.life<=0)
+{
+   bonus.active=0;
+   player.size=1;
+   score-=4;
+}}}
+//function for drawing health of point score and current level
+function draw_hud(ctx,w,h)
+{
+   ctx.fillStyle="#444"
+   ctx.fillRect(0,0,w,h)
+   ctx. font=25 *scale +"px bold"
+   ctx.fillStyle="#fcc"
+   ctx. fillText(score,w*.1/2, h/1.8)
+   ctx. fillText(lvl,w-w*.1/2, h/1.8)
+   c="rgba("+parseInt(255-( 155*point.life/100) )+","+parseInt(255*point.life/100)+","+parseInt(0)+",1)";
+   draw_health(ctx, w*.2, h*.1,200 *scale ,20 *scale ,"grey",c,point. life)
+    if(bonus.active){draw_health(ctx, w*.2, h*.55,200 *scale ,20 *scale ,"red","yellow",bonus. life)}
+}
+
+
+//function for rendering game and all objects
+function render_game(){
+h= canvas.height*.1
+draw_hud(ctx,canvas.width,h); //draw hud
+
+//fill background 
+ctx.fillStyle="rgba(220,150,50,1)"
+ctx.fillRect(0, h ,canvas.width,canvas.height)
+
+point.draw(ctx);
+player.draw(ctx)
+enemy.draw(ctx)
+//if bonus is active draw it
+if(bonus.active)
+{
+bonus. draw(ctx)
+}
+ctx.fillStyle="red"
+}
+
+function update_score()
+{
+
+}
+//draw score state
+function render_score()
+{
+var msg=[""] //msg to be display in score state
+msg. push("Game Over")
+msg.push("")
+msg.push("")
+msg.push ("Your Score")
+msg.push("")
+msg.push (score)
+ctx.font=60 *scale +"px bold";//set font size
+ctx.fillStyle="rgba(100,50,200,1) "
+ctx.fillRect(0, 0,canvas.width,canvas.height)
+//loop through all msg and draw it
+for(var i=0;i<msg.length;i++)
+{ ctx.fillStyle="rgba(40,40,40,1)"
+   ctx.fillText(msg[i],10 *scale ,40*i *scale +10 *scale ,canvas.width-20 *scale )
+}
+}//end of splash.
+
+function update_about()
+{
+
+}
+//draw about state same as score render
+function render_about()
+{
+var msg=[""]
+msg. push("About")
+msg.push("")
+msg.push("ZaZa game")
+msg.push("Version 1.0")
+msg.push("")
+msg.push("Created by:")
+msg.push("Moin")
+msg.push("")
+msg.push("To download Source code goto FB page or Blog");
+
+
+ctx.shadowColor="#333"
+ctx. shadowOffsetX=3;
+
+ctx.font=30*scale +"px bold";
+ctx.fillStyle="rgba(100,50,200,1) "
+ctx.fillRect(0, 0,canvas.width,canvas.height)
+for(var i=0;i<msg.length;i++)
+{ ctx.fillStyle="rgba(255,255,255,1)"
+   ctx.fillText(msg[i],10 *scale ,30*i *scale +10 *scale ,canvas.width-20 *scale )
+}
+
+}//end of about
+
+function update_help()
+{
+
+}
+//draw help state
+function render_help()
+{
+
+var msg=[ "","You can only Control player","up and down movment not left and right","Move touch up to jump","Move touch down to dive","Start to play Game"];
+msg.push("Blue is player, Red is enemy, Eat green circles");
+msg. push("when eat 5 green circles your size","increase and yellow circle apears")
+msg.push("when yellow circle apears eat it before","timeout and dont eat green circle")
+msg.push("your score will decrease");
+
+ctx.shadowColor="#333"
+ctx. shadowOffsetX=3;
+ctx.font=40 *scale +"px bold";
+ctx.fillStyle="rgba(100,50,200,1) "
+ctx.fillRect(0, 0,canvas.width,canvas.height)
+for(var i=1;i<msg.length;i++)
+{ ctx.fillStyle="#fff"
+   ctx.fillText(msg[i],10 *scale ,40*i *scale ,canvas.width-20)
+}
+
+}//end of help
+
+ //start the game
+main();
+
+</script>
+</body>
+</html>
